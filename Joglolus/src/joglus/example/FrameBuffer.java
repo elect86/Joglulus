@@ -58,7 +58,6 @@ public class FrameBuffer {
             gl3.glBindFramebuffer(GL3.GL_FRAMEBUFFER, frameBufferId[0]);
 
             gl3.glFramebufferTexture2D(GL3.GL_FRAMEBUFFER, GL3.GL_DEPTH_ATTACHMENT, GL3.GL_TEXTURE_2D, depthId[0], 0);
-            gl3.glFramebufferTexture2D(GL3.GL_FRAMEBUFFER, GL3.GL_COLOR_ATTACHMENT0, GL3.GL_TEXTURE_2D, textureId[0], 0);
         }
         gl3.glBindFramebuffer(GL3.GL_FRAMEBUFFER, 0);
     }

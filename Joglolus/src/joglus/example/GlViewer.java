@@ -69,6 +69,11 @@ public class GlViewer implements GLEventListener {
         setup();
 
         setupOculus();
+        
+        animator = new Animator(glWindow);
+        animator.start();
+        
+        glWindow.setVisible(true);
     }
 
     private void setup() {
@@ -90,15 +95,10 @@ public class GlViewer implements GLEventListener {
 
         fullscreen = false;
         glWindow.setFullscreen(fullscreen);
-
-        animator = new Animator(glWindow);
-        animator.start();
-
-        glWindow.setVisible(true);
     }
 
     private void setupOculus() {
-
+        System.out.println("1");
         HmdDesc.initialize();
 
         try {
@@ -133,6 +133,7 @@ public class GlViewer implements GLEventListener {
             header.RenderViewport.Size = header.TextureSize;
             header.RenderViewport.Pos = new OvrVector2i(0, 0);
         }
+        System.out.println("/1");
     }
 
     private static HmdDesc openFirstHmd() {
@@ -167,7 +168,7 @@ public class GlViewer implements GLEventListener {
     }
 
     private void initOculus(GL3 gl3) {
-
+        System.out.println("2");
         for (int eye = 0; eye < 2; ++eye) {
             TextureHeader eth = eyeTextures[eye].Header;
             frameBuffers[eye] = new FrameBuffer(gl3, new Vec2i(eth.TextureSize.w, eth.TextureSize.h));
@@ -181,6 +182,7 @@ public class GlViewer implements GLEventListener {
         int distortionCaps = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp | ovrDistortionCap_Vignette;
 
         eyeRenderDescs = hmdDesc.configureRendering(rc, distortionCaps, fovPorts);
+        System.out.println("/2");
     }
 
     private void initVBO(GL3 gl3) {
@@ -230,36 +232,36 @@ public class GlViewer implements GLEventListener {
     @Override
     public void display(GLAutoDrawable glad) {
 
-        System.out.println("displsay");
+        System.out.println("display");
         GL3 gl3 = glad.getGL().getGL3();
 
         hmdDesc.beginFrame(++frameCount);
         for (int i = 0; i < 2; ++i) {
             int eye = hmdDesc.EyeRenderOrder[i];
-            MatrixStack.PROJECTION.set(projections[eye]);
-            // This doesn't work as it breaks the contiguous nature of the array
-            Posef p = hmdDesc.getEyePose(eye);
-            // FIXME there has to be a better way to do this
-            poses[eye].Orientation = p.Orientation;
-            poses[eye].Position = p.Position;
-
-            MatrixStack mv = MatrixStack.MODELVIEW;
-            mv.push();
+//            MatrixStack.PROJECTION.set(projections[eye]);
+//            // This doesn't work as it breaks the contiguous nature of the array
+//            Posef p = hmdDesc.getEyePose(eye);
+//            // FIXME there has to be a better way to do this
+//            poses[eye].Orientation = p.Orientation;
+//            poses[eye].Position = p.Position;
+//
+//            MatrixStack mv = MatrixStack.MODELVIEW;
+//            mv.push();
             {
-                mv.preTranslate(RiftUtils.toVector3f(poses[eye].Position).mult(-1));
-                mv.preRotate(RiftUtils.toQuaternion(poses[eye].Orientation).inverse());
-                mv.preTranslate(RiftUtils.toVector3f(eyeRenderDescs[eye].ViewAdjust));
+//                mv.preTranslate(RiftUtils.toVector3f(poses[eye].Position).mult(-1));
+//                mv.preRotate(RiftUtils.toQuaternion(poses[eye].Orientation).inverse());
+//                mv.preTranslate(RiftUtils.toVector3f(eyeRenderDescs[eye].ViewAdjust));
                 frameBuffers[eye].activate(gl3);
                 {
                     render(gl3);
                 }
                 frameBuffers[eye].deactivate(gl3);
             }
-            mv.pop();
+//            mv.pop();
         }
         hmdDesc.endFrame(poses, eyeTextures);
 
-//        checkError(gl3);
+        checkError(gl3);
     }
 
     private void render(GL3 gl3) {
