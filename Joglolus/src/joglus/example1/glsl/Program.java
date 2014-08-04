@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package joglulus.example1.glsl;
+package joglus.example1.glsl;
 
 import javax.media.opengl.GL3;
 

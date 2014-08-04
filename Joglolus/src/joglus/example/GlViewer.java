@@ -3,14 +3,25 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package joglulus.example1;
+package joglus.example;
 
 import com.jogamp.newt.awt.NewtCanvasAWT;
 import com.jogamp.newt.opengl.GLWindow;
 import com.jogamp.opengl.util.Animator;
 import com.jogamp.opengl.util.GLBuffers;
+import com.oculusvr.capi.EyeRenderDesc;
+import com.oculusvr.capi.FovPort;
 import com.oculusvr.capi.HmdDesc;
+import static com.oculusvr.capi.OvrLibrary.ovrDistortionCaps.ovrDistortionCap_Chromatic;
+import static com.oculusvr.capi.OvrLibrary.ovrDistortionCaps.ovrDistortionCap_TimeWarp;
+import static com.oculusvr.capi.OvrLibrary.ovrDistortionCaps.ovrDistortionCap_Vignette;
 import static com.oculusvr.capi.OvrLibrary.ovrHmdType.ovrHmd_DK1;
+import static com.oculusvr.capi.OvrLibrary.ovrTrackingCaps.ovrTrackingCap_Orientation;
+import com.oculusvr.capi.OvrVector2i;
+import com.oculusvr.capi.Posef;
+import com.oculusvr.capi.RenderAPIConfig;
+import com.oculusvr.capi.Texture;
+import com.oculusvr.capi.TextureHeader;
 import javax.media.opengl.GL3;
 import javax.media.opengl.GLAutoDrawable;
 import javax.media.opengl.GLCapabilities;
@@ -18,7 +29,10 @@ import javax.media.opengl.GLEventListener;
 import javax.media.opengl.GLProfile;
 import jglm.Jglm;
 import jglm.Mat4;
-import joglulus.example.glsl.Program;
+import org.saintandreas.math.Matrix4f;
+import joglus.example.glsl.Program;
+import jglm.Vec2i;
+import org.saintandreas.gl.MatrixStack;
 
 /**
  *
@@ -41,6 +55,15 @@ public class GlViewer implements GLEventListener {
     private float[] verticesData;
     private Program program;
 
+    private HmdDesc hmdDesc;
+    private FovPort[] fovPorts;
+    private Texture[] eyeTextures;
+    private FrameBuffer[] frameBuffers;
+    private Matrix4f[] projections;
+    private EyeRenderDesc[] eyeRenderDescs;
+    private Posef[] poses;
+    private int frameCount;
+
     public GlViewer() {
 
         setup();
@@ -59,7 +82,7 @@ public class GlViewer implements GLEventListener {
          *  by encapsulating the glWindow inside a NewtCanvasAWT canvas.
          */
         newtCanvasAWT = new NewtCanvasAWT(glWindow);
-        
+
         glWindow.setSize(1280, 800);
         glWindow.addGLEventListener(this);
         keyListener = new KeyListener(this);
@@ -84,39 +107,39 @@ public class GlViewer implements GLEventListener {
             throw new IllegalStateException(e);
         }
 
-//        hmdDesc = openFirstHmd();
-//
-//        if (null == hmdDesc) {
-//            throw new IllegalStateException("Unable to initialize HMD");
-//        }
-//        if (hmdDesc.configureTracking(ovrTrackingCap_Orientation, 0) == 0) {
-//            throw new IllegalStateException("Unable to start the sensor");
-//        }
-//        fovPorts = (FovPort[]) new FovPort().toArray(2);
-//        eyeTextures = (Texture[]) new Texture().toArray(2);
-//        poses = (Posef[]) new Posef().toArray(2);
-//        frameBuffers = new FrameBuffer[2];
-//        projections = new Matrix4f[2];
-//        frameCount = -1;
-//
-//        for (int eye = 0; eye < 2; ++eye) {
-//
-//            fovPorts[eye] = hmdDesc.DefaultEyeFov[eye];
-//            projections[eye] = RiftUtils.toMatrix4f(HmdDesc.getPerspectiveProjection(fovPorts[eye], 0.1f, 1000000f, true));
-//
-//            Texture texture = eyeTextures[eye];
-//            TextureHeader header = texture.Header;
-//            header.TextureSize = hmdDesc.getFovTextureSize(eye, fovPorts[eye], 1.0f);
-//            header.RenderViewport.Size = header.TextureSize;
-//            header.RenderViewport.Pos = new OvrVector2i(0, 0);
-//        }
+        hmdDesc = openFirstHmd();
+
+        if (null == hmdDesc) {
+            throw new IllegalStateException("Unable to initialize HMD");
+        }
+        if (hmdDesc.configureTracking(ovrTrackingCap_Orientation, 0) == 0) {
+            throw new IllegalStateException("Unable to start the sensor");
+        }
+        fovPorts = (FovPort[]) new FovPort().toArray(2);
+        eyeTextures = (Texture[]) new Texture().toArray(2);
+        poses = (Posef[]) new Posef().toArray(2);
+        frameBuffers = new FrameBuffer[2];
+        projections = new Matrix4f[2];
+        frameCount = -1;
+
+        for (int eye = 0; eye < 2; ++eye) {
+
+            fovPorts[eye] = hmdDesc.DefaultEyeFov[eye];
+            projections[eye] = RiftUtils.toMatrix4f(HmdDesc.getPerspectiveProjection(fovPorts[eye], 0.1f, 1000000f, true));
+
+            Texture texture = eyeTextures[eye];
+            TextureHeader header = texture.Header;
+            header.TextureSize = hmdDesc.getFovTextureSize(eye, fovPorts[eye], 1.0f);
+            header.RenderViewport.Size = header.TextureSize;
+            header.RenderViewport.Pos = new OvrVector2i(0, 0);
+        }
     }
 
     private static HmdDesc openFirstHmd() {
         HmdDesc hmdDesc = HmdDesc.create(0);
-//        if (hmdDesc == null) {
-//            hmdDesc = HmdDesc.createDebug(ovrHmd_DK1);
-//        }
+        if (hmdDesc == null) {
+            hmdDesc = HmdDesc.createDebug(ovrHmd_DK1);
+        }
         return hmdDesc;
     }
 
@@ -130,7 +153,7 @@ public class GlViewer implements GLEventListener {
 
         initVAO(gl3);
 
-        program = new Program(gl3, "/example1/glsl/shaders/", "Colored_VS.glsl", "Colored_FS.glsl");
+        program = new Program(gl3, "/joglus/example/glsl/shaders/", "Colored_VS.glsl", "Colored_FS.glsl");
 
         program.bind(gl3);
         {
@@ -139,6 +162,25 @@ public class GlViewer implements GLEventListener {
             gl3.glUniformMatrix4fv(program.getModelViewUL(), 1, false, modelView.toFloatArray(), 0);
         }
         program.unbind(gl3);
+
+        initOculus(gl3);
+    }
+
+    private void initOculus(GL3 gl3) {
+
+        for (int eye = 0; eye < 2; ++eye) {
+            TextureHeader eth = eyeTextures[eye].Header;
+            frameBuffers[eye] = new FrameBuffer(gl3, new Vec2i(eth.TextureSize.w, eth.TextureSize.h));
+            eyeTextures[eye].TextureId = frameBuffers[eye].getTextureId()[0];
+        }
+
+        RenderAPIConfig rc = new RenderAPIConfig();
+        rc.Header.RTSize = hmdDesc.Resolution;
+        rc.Header.Multisample = 1;
+
+        int distortionCaps = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp | ovrDistortionCap_Vignette;
+
+        eyeRenderDescs = hmdDesc.configureRendering(rc, distortionCaps, fovPorts);
     }
 
     private void initVBO(GL3 gl3) {
@@ -180,18 +222,42 @@ public class GlViewer implements GLEventListener {
 
         System.out.println("dispose");
 
-//        hmdDesc.destroy();
-//        HmdDesc.shutdown();
+        hmdDesc.destroy();
+        HmdDesc.shutdown();
         System.exit(0);
     }
 
     @Override
     public void display(GLAutoDrawable glad) {
 
-//        System.out.println("displsay");
+        System.out.println("displsay");
         GL3 gl3 = glad.getGL().getGL3();
 
-        render(gl3);
+        hmdDesc.beginFrame(++frameCount);
+        for (int i = 0; i < 2; ++i) {
+            int eye = hmdDesc.EyeRenderOrder[i];
+            MatrixStack.PROJECTION.set(projections[eye]);
+            // This doesn't work as it breaks the contiguous nature of the array
+            Posef p = hmdDesc.getEyePose(eye);
+            // FIXME there has to be a better way to do this
+            poses[eye].Orientation = p.Orientation;
+            poses[eye].Position = p.Position;
+
+            MatrixStack mv = MatrixStack.MODELVIEW;
+            mv.push();
+            {
+                mv.preTranslate(RiftUtils.toVector3f(poses[eye].Position).mult(-1));
+                mv.preRotate(RiftUtils.toQuaternion(poses[eye].Orientation).inverse());
+                mv.preTranslate(RiftUtils.toVector3f(eyeRenderDescs[eye].ViewAdjust));
+                frameBuffers[eye].activate(gl3);
+                {
+                    render(gl3);
+                }
+                frameBuffers[eye].deactivate(gl3);
+            }
+            mv.pop();
+        }
+        hmdDesc.endFrame(poses, eyeTextures);
 
 //        checkError(gl3);
     }
@@ -203,19 +269,16 @@ public class GlViewer implements GLEventListener {
 
         gl3.glEnable(GL3.GL_DEPTH_TEST);
         {
-            program.bind(gl3);
+
+            gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vbo[0]);
             {
-                gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vbo[0]);
+                gl3.glBindVertexArray(vao[0]);
                 {
-                    gl3.glBindVertexArray(vao[0]);
-                    {
-                        gl3.glDrawArrays(GL3.GL_TRIANGLES, 0, verticesData.length / 3);
-                    }
-                    gl3.glBindVertexArray(0);
+                    gl3.glDrawArrays(GL3.GL_TRIANGLES, 0, verticesData.length / 3);
                 }
-                gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, 0);
+                gl3.glBindVertexArray(0);
             }
-            program.unbind(gl3);
+            gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, 0);
         }
         gl3.glDisable(GL3.GL_DEPTH_TEST);
     }

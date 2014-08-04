@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package joglulus.example;
+package joglus.example1;
 
 import com.jogamp.newt.event.KeyEvent;
 

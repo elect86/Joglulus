@@ -1,4 +1,4 @@
-package joglulus.example;
+package joglus.example1;
 
 import org.saintandreas.math.Matrix4f;
 import org.saintandreas.math.Quaternion;
