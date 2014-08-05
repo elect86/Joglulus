@@ -10,7 +10,10 @@ import com.jogamp.newt.opengl.GLWindow;
 import com.jogamp.opengl.util.Animator;
 import com.jogamp.opengl.util.GLBuffers;
 import com.oculusvr.capi.HmdDesc;
+import com.oculusvr.capi.OvrLibrary;
 import static com.oculusvr.capi.OvrLibrary.ovrHmdType.ovrHmd_DK1;
+import static com.oculusvr.capi.OvrLibrary.ovrTrackingCaps.ovrTrackingCap_Orientation;
+import com.oculusvr.capi.OvrSizei;
 import javax.media.opengl.GL3;
 import javax.media.opengl.GLAutoDrawable;
 import javax.media.opengl.GLCapabilities;
@@ -41,14 +44,18 @@ public class GlViewer implements GLEventListener {
     private float[] verticesData;
     private Program program;
 
+    private HmdDesc hmdDesc;
+
     public GlViewer() {
 
         setup();
 
         setupOculus();
+//glWindow.setVisible(true);
     }
 
     private void setup() {
+        System.out.println("setup()");
         GLProfile gLProfile = GLProfile.getDefault();
 
         GLCapabilities gLCapabilities = new GLCapabilities(gLProfile);
@@ -59,23 +66,26 @@ public class GlViewer implements GLEventListener {
          *  by encapsulating the glWindow inside a NewtCanvasAWT canvas.
          */
         newtCanvasAWT = new NewtCanvasAWT(glWindow);
-        
-        glWindow.setSize(1280, 800);
-        glWindow.addGLEventListener(this);
+
         keyListener = new KeyListener(this);
         glWindow.addKeyListener(keyListener);
 
-        fullscreen = false;
-        glWindow.setFullscreen(fullscreen);
+//        fullscreen = false;
+//        glWindow.setFullscreen(fullscreen);
+
+        
+        glWindow.setSize(1280, 800);
+        glWindow.addGLEventListener(this);
 
         animator = new Animator(glWindow);
         animator.start();
-
         glWindow.setVisible(true);
+
+        System.out.println("/setup()");
     }
 
     private void setupOculus() {
-
+        System.out.println("setupOculus()");
         HmdDesc.initialize();
 
         try {
@@ -84,14 +94,15 @@ public class GlViewer implements GLEventListener {
             throw new IllegalStateException(e);
         }
 
-//        hmdDesc = openFirstHmd();
-//
-//        if (null == hmdDesc) {
-//            throw new IllegalStateException("Unable to initialize HMD");
-//        }
-//        if (hmdDesc.configureTracking(ovrTrackingCap_Orientation, 0) == 0) {
-//            throw new IllegalStateException("Unable to start the sensor");
-//        }
+        hmdDesc = openFirstHmd();
+
+        if (null == hmdDesc) {
+            throw new IllegalStateException("Unable to initialize HMD");
+        }
+        if (hmdDesc.configureTracking(ovrTrackingCap_Orientation, 0) == 0) {
+            throw new IllegalStateException("Unable to start the sensor");
+        }
+
 //        fovPorts = (FovPort[]) new FovPort().toArray(2);
 //        eyeTextures = (Texture[]) new Texture().toArray(2);
 //        poses = (Posef[]) new Posef().toArray(2);
@@ -110,13 +121,14 @@ public class GlViewer implements GLEventListener {
 //            header.RenderViewport.Size = header.TextureSize;
 //            header.RenderViewport.Pos = new OvrVector2i(0, 0);
 //        }
+        System.out.println("/setupOculus()");
     }
 
     private static HmdDesc openFirstHmd() {
         HmdDesc hmdDesc = HmdDesc.create(0);
-//        if (hmdDesc == null) {
-//            hmdDesc = HmdDesc.createDebug(ovrHmd_DK1);
-//        }
+        if (hmdDesc == null) {
+            hmdDesc = HmdDesc.createDebug(ovrHmd_DK1);
+        }
         return hmdDesc;
     }
 
@@ -130,7 +142,7 @@ public class GlViewer implements GLEventListener {
 
         initVAO(gl3);
 
-        program = new Program(gl3, "/example1/glsl/shaders/", "Colored_VS.glsl", "Colored_FS.glsl");
+        program = new Program(gl3, "/joglus/example1/glsl/shaders/", "Colored_VS.glsl", "Colored_FS.glsl");
 
         program.bind(gl3);
         {
@@ -139,6 +151,8 @@ public class GlViewer implements GLEventListener {
             gl3.glUniformMatrix4fv(program.getModelViewUL(), 1, false, modelView.toFloatArray(), 0);
         }
         program.unbind(gl3);
+
+        initOculus(gl3);
     }
 
     private void initVBO(GL3 gl3) {
@@ -175,12 +189,22 @@ public class GlViewer implements GLEventListener {
         gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, 0);
     }
 
+    private void initOculus(GL3 gl3) {
+
+//        OvrSizei recommendedTex0Size = hmdDesc.getFovTextureSize(OvrLibrary.ovrEyeType.ovrEye_Left, hmdDesc.DefaultEyeFov[0], 1f);
+//        OvrSizei recommendedTex1Size = hmdDesc.getFovTextureSize(OvrLibrary.ovrEyeType.ovrEye_Right, hmdDesc.DefaultEyeFov[1], 1f);
+//        int x = recommendedTex0Size.w + recommendedTex1Size.w;
+//        int y = Math.max(recommendedTex0Size.h, recommendedTex1Size.h);
+//        OvrSizei renderTargetSize = new OvrSizei(x, y);
+
+    }
+
     @Override
     public void dispose(GLAutoDrawable glad) {
 
         System.out.println("dispose");
 
-//        hmdDesc.destroy();
+        hmdDesc.destroy();
 //        HmdDesc.shutdown();
         System.exit(0);
     }
@@ -188,12 +212,11 @@ public class GlViewer implements GLEventListener {
     @Override
     public void display(GLAutoDrawable glad) {
 
-//        System.out.println("displsay");
+        System.out.println("display");
         GL3 gl3 = glad.getGL().getGL3();
 
-        render(gl3);
-
-//        checkError(gl3);
+//        render(gl3);
+        checkError(gl3);
     }
 
     private void render(GL3 gl3) {

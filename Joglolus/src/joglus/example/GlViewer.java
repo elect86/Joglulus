@@ -8,6 +8,7 @@ package joglus.example;
 import com.jogamp.newt.awt.NewtCanvasAWT;
 import com.jogamp.newt.opengl.GLWindow;
 import com.jogamp.opengl.util.Animator;
+import com.jogamp.opengl.util.FPSAnimator;
 import com.jogamp.opengl.util.GLBuffers;
 import com.oculusvr.capi.EyeRenderDesc;
 import com.oculusvr.capi.FovPort;
@@ -17,11 +18,16 @@ import static com.oculusvr.capi.OvrLibrary.ovrDistortionCaps.ovrDistortionCap_Ti
 import static com.oculusvr.capi.OvrLibrary.ovrDistortionCaps.ovrDistortionCap_Vignette;
 import static com.oculusvr.capi.OvrLibrary.ovrHmdType.ovrHmd_DK1;
 import static com.oculusvr.capi.OvrLibrary.ovrTrackingCaps.ovrTrackingCap_Orientation;
+import com.oculusvr.capi.OvrQuaternionf;
 import com.oculusvr.capi.OvrVector2i;
+import com.oculusvr.capi.OvrVector3f;
 import com.oculusvr.capi.Posef;
 import com.oculusvr.capi.RenderAPIConfig;
 import com.oculusvr.capi.Texture;
 import com.oculusvr.capi.TextureHeader;
+import java.awt.Frame;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import javax.media.opengl.GL3;
 import javax.media.opengl.GLAutoDrawable;
 import javax.media.opengl.GLCapabilities;
@@ -29,9 +35,11 @@ import javax.media.opengl.GLEventListener;
 import javax.media.opengl.GLProfile;
 import jglm.Jglm;
 import jglm.Mat4;
+import jglm.Quat;
 import org.saintandreas.math.Matrix4f;
 import joglus.example.glsl.Program;
 import jglm.Vec2i;
+import jogamp.graph.font.typecast.ot.table.Table;
 import org.saintandreas.gl.MatrixStack;
 
 /**
@@ -40,9 +48,34 @@ import org.saintandreas.gl.MatrixStack;
  */
 public class GlViewer implements GLEventListener {
 
+    /**
+     * @param args the command line arguments
+     */
     public static void main(String[] args) {
 
-        new GlViewer();
+        final GlViewer glViewer = new GlViewer();
+        glViewer.initGL();
+        glViewer.setupOculus();
+        
+        Frame frame = new Frame("Joglus");
+
+        frame.add(glViewer.newtCanvasAWT);
+
+        frame.setSize(glViewer.glWindow.getWidth(), glViewer.glWindow.getHeight());
+
+        final FPSAnimator fPSAnimator = new FPSAnimator(glViewer.glWindow, 30);
+
+        frame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent windowEvent) {
+                fPSAnimator.stop();
+                glViewer.glWindow.destroy();
+                System.exit(0);
+            }
+        });
+
+        fPSAnimator.start();
+        frame.setVisible(true);
     }
 
     private GLWindow glWindow;
@@ -65,18 +98,10 @@ public class GlViewer implements GLEventListener {
     private int frameCount;
 
     public GlViewer() {
-
-        setup();
-
-        setupOculus();
-        
-        animator = new Animator(glWindow);
-        animator.start();
-        
-        glWindow.setVisible(true);
     }
 
-    private void setup() {
+    public void initGL() {
+        System.out.println("initGL()");
         GLProfile gLProfile = GLProfile.getDefault();
 
         GLCapabilities gLCapabilities = new GLCapabilities(gLProfile);
@@ -88,17 +113,22 @@ public class GlViewer implements GLEventListener {
          */
         newtCanvasAWT = new NewtCanvasAWT(glWindow);
 
-        glWindow.setSize(1280, 800);
-        glWindow.addGLEventListener(this);
         keyListener = new KeyListener(this);
         glWindow.addKeyListener(keyListener);
 
-        fullscreen = false;
-        glWindow.setFullscreen(fullscreen);
+        glWindow.addGLEventListener(this);
+//        fullscreen = false;
+//        glWindow.setFullscreen(fullscreen);
+
+//        animator = new Animator(glWindow);
+//        animator.start();
+        glWindow.setSize(1280, 800);
+//        glWindow.setVisible(true);
+        System.out.println("/initGL()");
     }
 
-    private void setupOculus() {
-        System.out.println("1");
+    public void setupOculus() {
+        System.out.println("setupOculus() ");
         HmdDesc.initialize();
 
         try {
@@ -133,7 +163,7 @@ public class GlViewer implements GLEventListener {
             header.RenderViewport.Size = header.TextureSize;
             header.RenderViewport.Pos = new OvrVector2i(0, 0);
         }
-        System.out.println("/1");
+        System.out.println("/setupOculus() ");
     }
 
     private static HmdDesc openFirstHmd() {
@@ -165,10 +195,11 @@ public class GlViewer implements GLEventListener {
         program.unbind(gl3);
 
         initOculus(gl3);
+        System.out.println("/init");
     }
 
     private void initOculus(GL3 gl3) {
-        System.out.println("2");
+        System.out.println("initOculus");
         for (int eye = 0; eye < 2; ++eye) {
             TextureHeader eth = eyeTextures[eye].Header;
             frameBuffers[eye] = new FrameBuffer(gl3, new Vec2i(eth.TextureSize.w, eth.TextureSize.h));
@@ -182,7 +213,7 @@ public class GlViewer implements GLEventListener {
         int distortionCaps = ovrDistortionCap_Chromatic | ovrDistortionCap_TimeWarp | ovrDistortionCap_Vignette;
 
         eyeRenderDescs = hmdDesc.configureRendering(rc, distortionCaps, fovPorts);
-        System.out.println("/2");
+        System.out.println("/initOculus");
     }
 
     private void initVBO(GL3 gl3) {
@@ -225,7 +256,7 @@ public class GlViewer implements GLEventListener {
         System.out.println("dispose");
 
         hmdDesc.destroy();
-        HmdDesc.shutdown();
+//        HmdDesc.shutdown();
         System.exit(0);
     }
 
@@ -235,16 +266,28 @@ public class GlViewer implements GLEventListener {
         System.out.println("display");
         GL3 gl3 = glad.getGL().getGL3();
 
+        gl3.glClearColor(1f, 1f, 1f, 1f);
+        gl3.glClear(GL3.GL_COLOR_BUFFER_BIT);
+
         hmdDesc.beginFrame(++frameCount);
+//        hmdDesc.beginFrameTiming(++frameCount);
         for (int i = 0; i < 2; ++i) {
             int eye = hmdDesc.EyeRenderOrder[i];
 //            MatrixStack.PROJECTION.set(projections[eye]);
-//            // This doesn't work as it breaks the contiguous nature of the array
-//            Posef p = hmdDesc.getEyePose(eye);
+//             This doesn't work as it breaks the contiguous nature of the array
+            Posef p = hmdDesc.getEyePose(eye);
+//            Quat quat = new Quat(
+//                hmdDesc.getEyePose(hmdDesc.EyeRenderOrder[0]).Orientation.x, 
+//                hmdDesc.getEyePose(hmdDesc.EyeRenderOrder[0]).Orientation.y, 
+//                hmdDesc.getEyePose(hmdDesc.EyeRenderOrder[0]).Orientation.z, 
+//                hmdDesc.getEyePose(hmdDesc.EyeRenderOrder[0]).Orientation.w);
+//        quat.print("quat");
 //            // FIXME there has to be a better way to do this
-//            poses[eye].Orientation = p.Orientation;
-//            poses[eye].Position = p.Position;
-//
+            poses[eye].Orientation = p.Orientation;
+            poses[eye].Position = p.Position;
+//            poses[eye].Orientation = new OvrQuaternionf(0, 0, 0, 1);
+//            poses[eye].Position = new OvrVector3f(0, 0, 0);
+
 //            MatrixStack mv = MatrixStack.MODELVIEW;
 //            mv.push();
             {
@@ -260,6 +303,7 @@ public class GlViewer implements GLEventListener {
 //            mv.pop();
         }
         hmdDesc.endFrame(poses, eyeTextures);
+//        hmdDesc.endFrameTiming();
 
         checkError(gl3);
     }
