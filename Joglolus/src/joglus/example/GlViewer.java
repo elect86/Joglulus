@@ -117,8 +117,8 @@ public class GlViewer implements GLEventListener {
         glWindow.addKeyListener(keyListener);
 
         glWindow.addGLEventListener(this);
-//        fullscreen = false;
-//        glWindow.setFullscreen(fullscreen);
+        fullscreen = false;
+        glWindow.setFullscreen(fullscreen);
 
 //        animator = new Animator(glWindow);
 //        animator.start();
