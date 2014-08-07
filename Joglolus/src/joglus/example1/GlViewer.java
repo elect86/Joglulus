@@ -12,14 +12,21 @@ import com.jogamp.opengl.util.FPSAnimator;
 import com.jogamp.opengl.util.GLBuffers;
 import com.jogamp.opengl.util.GLReadBufferUtil;
 import com.jogamp.opengl.util.texture.TextureIO;
+import com.oculusvr.capi.DistortionMesh;
+import com.oculusvr.capi.DistortionVertex;
 import com.oculusvr.capi.FovPort;
 import com.oculusvr.capi.HmdDesc;
 import com.oculusvr.capi.OvrLibrary;
+import static com.oculusvr.capi.OvrLibrary.ovrEyeType.ovrEye_Count;
+import static com.oculusvr.capi.OvrLibrary.ovrEyeType.ovrEye_Left;
+import static com.oculusvr.capi.OvrLibrary.ovrEyeType.ovrEye_Right;
 import static com.oculusvr.capi.OvrLibrary.ovrHmdType.ovrHmd_DK1;
 import static com.oculusvr.capi.OvrLibrary.ovrTrackingCaps.ovrTrackingCap_Orientation;
 import com.oculusvr.capi.OvrRecti;
 import com.oculusvr.capi.OvrSizei;
 import com.oculusvr.capi.OvrVector2i;
+import com.sun.jna.Pointer;
+import com.sun.jna.Structure;
 import java.awt.Frame;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
@@ -36,10 +43,8 @@ import javax.media.opengl.GLException;
 import javax.media.opengl.GLProfile;
 import jglm.Jglm;
 import jglm.Mat4;
-import joglus.example1.glsl.Distortion;
-import joglus.example1.glsl.Program;
-import joglus.example1.texture.Texture;
-import joglus.example1.texture.TextureFormat;
+import joglus.example1.glsl.Fullscreen;
+import joglus.example1.glsl.Colored;
 
 /**
  *
@@ -84,11 +89,8 @@ public class GlViewer implements GLEventListener {
     private Animator animator;
     private int[] vbo;
     private int[] vao;
-    private int[] vboDistortion;
-    private int[] vaoDistortion;
-    private float[] verticesData;
-    private Program program;
-    private Distortion distortion;
+    private Colored program;
+    private Fullscreen distortion;
 
     private HmdDesc hmdDesc;
     private OvrRecti[] eyeRenderViewport;
@@ -168,8 +170,8 @@ public class GlViewer implements GLEventListener {
 
         initVAOs(gl3);
 
-        program = new Program(gl3, "/joglus/example1/glsl/shaders/", "Colored_VS.glsl", "Colored_FS.glsl");
-        distortion = new Distortion(gl3, "/joglus/example1/glsl/shaders/", "Distortion_VS.glsl", "Distortion_FS.glsl");
+        program = new Colored(gl3, "/joglus/example1/glsl/shaders/", "Colored_VS.glsl", "Colored_FS.glsl");
+        distortion = new Fullscreen(gl3, "/joglus/example1/glsl/shaders/", "Fullscreen_VS.glsl", "Fullscreen_FS.glsl");
 
         program.bind(gl3);
         {
@@ -192,15 +194,15 @@ public class GlViewer implements GLEventListener {
 
     private void initVBOs(GL3 gl3) {
 
-        verticesData = new float[]{
+        float[] verticesData = new float[]{
             -1f, -1f, -1f,
             0f, 1f, -1f,
             1f, 0f, -1};
 
-        vbo = new int[1];
-        gl3.glGenBuffers(1, vbo, 0);
+        vbo = new int[buffer.count.ordinal()];
+        gl3.glGenBuffers(buffer.count.ordinal(), vbo, 0);
 
-        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vbo[0]);
+        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vbo[buffer.firstPass.ordinal()]);
         {
             gl3.glBufferData(GL3.GL_ARRAY_BUFFER, verticesData.length * 4, GLBuffers.newDirectFloatBuffer(verticesData), GL3.GL_STATIC_DRAW);
         }
@@ -212,10 +214,7 @@ public class GlViewer implements GLEventListener {
             1f, 1f,
             0f, 1f};
 
-        vboDistortion = new int[1];
-        gl3.glGenBuffers(1, vboDistortion, 0);
-
-        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vboDistortion[0]);
+        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vbo[buffer.fullscreenQuad.ordinal()]);
         {
             gl3.glBufferData(GL3.GL_ARRAY_BUFFER, verticesData.length * 4, GLBuffers.newDirectFloatBuffer(verticesData), GL3.GL_STATIC_DRAW);
         }
@@ -224,12 +223,12 @@ public class GlViewer implements GLEventListener {
 
     private void initVAOs(GL3 gl3) {
 
-        vao = new int[1];
-        gl3.glGenVertexArrays(1, vao, 0);
+        vao = new int[buffer.count.ordinal()];
+        gl3.glGenVertexArrays(buffer.count.ordinal(), vao, 0);
 
-        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vbo[0]);
+        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vbo[buffer.firstPass.ordinal()]);
         {
-            gl3.glBindVertexArray(vao[0]);
+            gl3.glBindVertexArray(vao[buffer.firstPass.ordinal()]);
             {
                 gl3.glEnableVertexAttribArray(0);
                 gl3.glVertexAttribPointer(0, 3, GL3.GL_FLOAT, false, 0, 0);
@@ -238,12 +237,9 @@ public class GlViewer implements GLEventListener {
         }
         gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, 0);
 
-        vaoDistortion = new int[1];
-        gl3.glGenVertexArrays(1, vaoDistortion, 0);
-
-        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vboDistortion[0]);
+        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vao[buffer.fullscreenQuad.ordinal()]);
         {
-            gl3.glBindVertexArray(vaoDistortion[0]);
+            gl3.glBindVertexArray(vao[buffer.fullscreenQuad.ordinal()]);
             {
                 gl3.glEnableVertexAttribArray(0);
                 gl3.glVertexAttribPointer(0, 2, GL3.GL_FLOAT, false, 0, 0);
@@ -255,8 +251,8 @@ public class GlViewer implements GLEventListener {
 
     private void initOculus(GL3 gl3) {
         //Configure Stereo settings.
-        OvrSizei recommendedTex0Size = hmdDesc.getFovTextureSize(OvrLibrary.ovrEyeType.ovrEye_Left, hmdDesc.DefaultEyeFov[0], 1f);
-        OvrSizei recommendedTex1Size = hmdDesc.getFovTextureSize(OvrLibrary.ovrEyeType.ovrEye_Right, hmdDesc.DefaultEyeFov[1], 1f);
+        OvrSizei recommendedTex0Size = hmdDesc.getFovTextureSize(ovrEye_Left, hmdDesc.DefaultEyeFov[0], 1f);
+        OvrSizei recommendedTex1Size = hmdDesc.getFovTextureSize(ovrEye_Right, hmdDesc.DefaultEyeFov[1], 1f);
         int x = recommendedTex0Size.w + recommendedTex1Size.w;
         int y = Math.max(recommendedTex0Size.h, recommendedTex1Size.h);
         OvrSizei renderTargetSize = new OvrSizei(x, y);
@@ -271,6 +267,66 @@ public class GlViewer implements GLEventListener {
         eyeRenderViewport[0].Size = new OvrSizei(renderTargetSize.w / 2, renderTargetSize.h);
         eyeRenderViewport[1].Pos = new OvrVector2i((renderTargetSize.w + 1) / 2, 0);
         eyeRenderViewport[1].Size = eyeRenderViewport[0].Size;
+
+        for (int eyeNum = 0; eyeNum < ovrEye_Count; eyeNum++) {
+
+            DistortionMesh meshData = hmdDesc.createDistortionMesh(eyeNum, eyeFov[eyeNum], OvrDistortionCap.chromatic | OvrDistortionCap.timeWarp);
+            DistortionVertex[] structures = new DistortionVertex[meshData.VertexCount];
+            meshData.pVertexData.toArray(structures);
+
+            initDistortionVBO(gl3, structures);
+            
+            initDistortionVAO(gl3);
+        }
+    }
+
+    private void initDistortionVBO(GL3 gl3, DistortionVertex[] structures) {
+
+        int vertexSize = 2 + 1 + 1 + 2 + 2 + 2;
+        float[] vertexData = new float[vertexSize * structures.length];
+
+        for (int v = 0; v < structures.length; v++) {
+
+            vertexData[v * vertexSize + 0] = structures[v].ScreenPosNDC.x;
+            vertexData[v * vertexSize + 1] = structures[v].ScreenPosNDC.y;
+            vertexData[v * vertexSize + 2] = structures[v].TimeWarpFactor;
+            vertexData[v * vertexSize + 3] = structures[v].VignetteFactor;
+            vertexData[v * vertexSize + 4] = structures[v].TanEyeAnglesR.x;
+            vertexData[v * vertexSize + 5] = structures[v].TanEyeAnglesR.y;
+            vertexData[v * vertexSize + 6] = structures[v].TanEyeAnglesG.x;
+            vertexData[v * vertexSize + 7] = structures[v].TanEyeAnglesG.y;
+            vertexData[v * vertexSize + 8] = structures[v].TanEyeAnglesB.x;
+            vertexData[v * vertexSize + 9] = structures[v].TanEyeAnglesB.y;
+        }
+        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vbo[buffer.distorsion.ordinal()]);
+        {
+            FloatBuffer fb = GLBuffers.newDirectFloatBuffer(vertexData);
+
+            gl3.glBufferData(GL3.GL_ARRAY_BUFFER, vertexData.length * 4, fb, GL3.GL_STATIC_DRAW);
+        }
+        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, 0);
+    }
+
+    private void initDistortionVAO(GL3 gl3) {
+
+        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vao[buffer.distorsion.ordinal()]);
+        {
+            gl3.glBindVertexArray(vao[buffer.distorsion.ordinal()]);
+            {
+                for (int attrib = 0; attrib < 6; attrib++) {
+
+                    gl3.glEnableVertexAttribArray(attrib);
+                }
+                gl3.glVertexAttribPointer(0, 2, GL3.GL_FLOAT, false, 0, 0);
+                gl3.glVertexAttribPointer(1, 1, GL3.GL_FLOAT, false, 2 * 4, 0);
+                gl3.glVertexAttribPointer(2, 1, GL3.GL_FLOAT, false, (2 + 1) * 4, 0);
+                gl3.glVertexAttribPointer(3, 2, GL3.GL_FLOAT, false, (2 + 1 + 1) * 4, 0);
+                gl3.glVertexAttribPointer(4, 2, GL3.GL_FLOAT, false, (2 + 1 + 1 + 2) * 4, 0);
+                gl3.glVertexAttribPointer(5, 2, GL3.GL_FLOAT, false, (2 + 1 + 1 + 2 + 2) * 4, 0);
+            }
+            gl3.glBindVertexArray(0);
+        }
+        gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, 0);
     }
 
     @Override
@@ -297,7 +353,7 @@ public class GlViewer implements GLEventListener {
                 gl3.glClearColor(0, 0, 0, 1);
                 gl3.glClear(GL3.GL_COLOR_BUFFER_BIT | GL3.GL_DEPTH_BUFFER_BIT);
 
-                for (int eyeIndex = 0; eyeIndex < OvrLibrary.ovrEyeType.ovrEye_Count; eyeIndex++) {
+                for (int eyeIndex = 0; eyeIndex < ovrEye_Count; eyeIndex++) {
 
                     OvrRecti vp = eyeRenderViewport[eyeIndex];
 
@@ -347,9 +403,9 @@ public class GlViewer implements GLEventListener {
 
         program.bind(gl3);
         {
-            gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vbo[0]);
+            gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vbo[buffer.firstPass.ordinal()]);
             {
-                gl3.glBindVertexArray(vao[0]);
+                gl3.glBindVertexArray(vao[buffer.firstPass.ordinal()]);
                 {
                     gl3.glDrawArrays(GL3.GL_TRIANGLES, 0, 3);
                 }
@@ -364,12 +420,12 @@ public class GlViewer implements GLEventListener {
 
         distortion.bind(gl3);
         {
-            gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vboDistortion[0]);
+            gl3.glBindBuffer(GL3.GL_ARRAY_BUFFER, vbo[buffer.fullscreenQuad.ordinal()]);
             {
-                gl3.glBindVertexArray(vaoDistortion[0]);
+                gl3.glBindVertexArray(vao[buffer.fullscreenQuad.ordinal()]);
                 {
                     gl3.glActiveTexture(GL3.GL_TEXTURE0);
-                    gl3.glBindTexture(GL3.GL_TEXTURE_RECTANGLE, frameBuffer.getTextureId()[0]);
+                    gl3.glBindTexture(GL3.GL_TEXTURE_2D, frameBuffer.getTextureId()[0]);
                     gl3.glUniform1i(distortion.getTexture0UL(), 0);
 
                     gl3.glDrawArrays(GL3.GL_QUADS, 0, 4);
@@ -426,5 +482,13 @@ public class GlViewer implements GLEventListener {
         if (error != 0) {
             System.out.println("Error " + error + " !");
         }
+    }
+
+    private enum buffer {
+
+        firstPass,
+        fullscreenQuad,
+        distorsion,
+        count
     }
 }

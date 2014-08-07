@@ -11,12 +11,12 @@ import javax.media.opengl.GL3;
  *
  * @author gbarbieri
  */
-public class Program extends glsl.GLSLProgramObject {
+public class Colored extends glsl.GLSLProgramObject {
 
     private int projectionUL;
     private int modelViewUL;
 
-    public Program(GL3 gl3, String shadersFilepath, String vertexShader, String fragmentShader) {
+    public Colored(GL3 gl3, String shadersFilepath, String vertexShader, String fragmentShader) {
         super(gl3, shadersFilepath, vertexShader, fragmentShader);
 
         projectionUL = gl3.glGetUniformLocation(getProgramId(), "projection");

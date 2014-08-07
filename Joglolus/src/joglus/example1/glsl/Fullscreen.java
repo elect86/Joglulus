@@ -11,12 +11,12 @@ import javax.media.opengl.GL3;
  *
  * @author gbarbieri
  */
-public class Distortion extends glsl.GLSLProgramObject {
+public class Fullscreen extends glsl.GLSLProgramObject {
 
     private int modelToClipMatrixUL;
     private int texture0UL;
 
-    public Distortion(GL3 gl3, String shadersFilepath, String vertexShader, String fragmentShader) {
+    public Fullscreen(GL3 gl3, String shadersFilepath, String vertexShader, String fragmentShader) {
 
         super(gl3, shadersFilepath, vertexShader, fragmentShader);
 
